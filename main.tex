@@ -6,7 +6,7 @@
 
 % ready for submission
 \usepackage{neurips_2021}
-
+\usepackage{comment}
 % to compile a preprint version, e.g., for submission to arXiv, add add the
 % [preprint] option:
 %     \usepackage[preprint]{neurips_2021}
@@ -198,6 +198,8 @@ where $h_{t \rightarrow t'}(N_D(f_t)) = \overline{m_{t'}}$ and $ N_D(h_{t \right
 If this morphism holds, then we know the following two conditions hold:  1) the map between frames($h_{t \rightarrow t'}$) is accurate, and 2) the object discovery feature maps are consistent across frames. The first condition is given by the precision of optical-flow prediction network. The second condition coincide with the training objective of our object discovery network. We next describe how to enforce this second condition via contrastive learning.
 
 \subsection{Contrastive Learning}
+Our general goal is to make sure that object representations $m_t$ from different frames are consistent with each other, i.e. that each slot of the learned feature map should represent a consistent object. In order to achieve this goal, we first propagate the learned feature map of frame $t$ into a nearby frame $t'$: $\overline{m_{t'}} = h_{t \rightarrow t'}(N_D(f_t))$. Next we want to enforce the consistency on $\overline{m_{t'}}$ and $m_{t'}$. Doing so directly on feature maps would be too costly, thus we encode the learned feature maps $m_t$ using an 3-layer MLP $N_E$ into a latent embedding $z_t$. Finally we formalize our goal in a constrastive learning objective:
+\[\pmb{L} = d(N_E(m_{t'}),N_E(\overline{m_{t'}}))\]
 
 \subsection{Implementation Detail}
 A paragraph on implementation details somewhere. 
@@ -272,8 +274,8 @@ In robotics contexts, where motion is attributable to known robot actions, sever
 \jd{If space, a figure up front just displaying a collection of images from each dataset to illustrate their corresponding visual domains.}
 
 \subsection{Evaluation Metrics}
-\textbf{Slot Accuracy}\\
-\textbf{Slot Compactness}
+\textbf{MSE(Points)}\\
+\textbf{ARI}
 \subsection{Training and Evaluation Settings}
 \subsection{Baselines}
 
@@ -299,8 +301,59 @@ Metrics: 1) Slot Accuracy
 
 \jd{Prepare figures showing 1-2 nice examples for each dataset, perhaps a set of rows, where each row contains the input image, then the output masks of all baselines and our method for that image, similar to visualizations in papers like IODINE.}
 
+\begin{table}
+  \caption{Sample table title}
+  \label{sample-table}
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Simulated Control} \\
+    \cmidrule(r){2-5}  
+      & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
+    \midrule
+   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  &286.178 &      \\
+   \midrule
+    ARI$\uparrow$     &  0.5141849  & 0.398706  & - &   \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 
+\begin{table}
+  \caption{Sample table title}
+  \label{sample-table}
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Real Control} \\
+    \cmidrule(r){2-5}  
+      & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
+    \midrule
+   MSE(Points)$\downarrow$  &   &  786.482287   & 806.727197&      \\
+   \midrule
+    ARI$\uparrow$     & 0.1685787  &  0.1596932  & - &   \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}
+  \caption{Sample table title}
+  \label{sample-table}
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{4}{c}{3D Blocks} \\
+    \cmidrule(r){2-5}  
+      & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
+    \midrule
+   MSE(Points)$\downarrow$  &   &     & &      \\
+   \midrule
+    ARI$\uparrow$     &    &     & - &   \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{comment}
 \begin{table}
   \caption{Sample table title}
   \label{sample-table}
@@ -342,23 +395,6 @@ Metrics: 1) Slot Accuracy
   \centering
   \begin{tabular}{lllll}
     \toprule
-    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Simulated Control} \\
-    \cmidrule(r){2-5}  
-      & \textsc{flood}(Ours)      & C-SWM    & Slot Contrastive     & Slot Attention  \\
-    \midrule
-   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  & &      \\
-   \midrule
-    ARI$\uparrow$     &  0.5141849  & 0.398706  & - &   \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{table}
-  \caption{Sample table title}
-  \label{sample-table}
-  \centering
-  \begin{tabular}{lllll}
-    \toprule
     \multicolumn{1}{c}{} & \multicolumn{4}{c}{Real Control} \\
     \cmidrule(r){2-5}  
       & MSE(Points)$\downarrow$     & Slot Compactness$\uparrow$     & Slot Modularity$\uparrow$      & ARI$\uparrow$   \\
@@ -370,8 +406,7 @@ Metrics: 1) Slot Accuracy
     \bottomrule
   \end{tabular}
 \end{table}
-
-
+\end{comment}
 \section{Conclusions}\label{sec:conclusions}
 
 
