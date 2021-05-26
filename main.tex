@@ -129,7 +129,7 @@ We show how these ideas extend to unsupervised neural object discovery. Our tech
 
 \begin{figure}
     \centering
-    \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+    \includegraphics[width=8cm]{flood_main_figure.pdf}
     \caption{\jd{Introducing the idea that an optical flow warp applied to an object-structured representation should produce the object-structured representation of the next image}}
     \label{fig:desired_property}
 \end{figure}
@@ -172,7 +172,7 @@ We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks
 
 \begin{figure}
   \centering
-  \includegraphics[width=8cm]{method_draft.pdf}
+  \includegraphics[width=8cm]{flood-network.pdf}
 
   \caption{Sample figure caption.}
   \label{fig:architecture}
@@ -183,14 +183,19 @@ We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks
 
 Given some unlabeled video sequences, the goal of our method is to discover and learn object-centric representations with the help of motion information. Specifically, \textsc{flood} takes in an image input $f_t$, which is the video frame at time step $t$, and passing it through an object discovery network. This discovery network produces a set of feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$ around the discovered objects, where $k$ is the number of objects we expected. 
 
-In order to take advantages of the motion information available in a video, \textsc{flood} takes in motion information provided by optical flow between two nearby frames $f_{t'}$ and $f_t$, and propagates the predicted masks $m_{t'}$ to $\overline{m_{t}}$. If the optical flow between these two frames are correct, we should expect that $\overline{m_{t}}$ and $m_t$ encodes the same object information. We could then use this property to train our object discovery network.
+In order to take advantages of the motion information available in a video, \textsc{flood} takes in motion information provided by optical flow between two nearby frames $f_{t}$ and $f_{t'}$, and propagates the predicted feature maps $m_{t}$ to $\overline{m_{t'}}$. If the optical flow between these two frames are correct, we should expect that $\overline{m_{t'}}$ and $m_{t'}$ encodes the same object information. We could then use this property to train our object discovery network.
 
-In this section, we first introduce our object discovery network. Next we describe our desired property of the learned representations in terms of optical flow. In the end we explain how these desired properties are learned through contrastive learning. 
+In this section, we first introduce our object discovery network. Next we describe our desired property of the learned representations in terms of optical flow. In the end we explain how to use these desired properties to train the object discovery network through contrastive learning. 
 
 \subsection{Object Discovery Network}
-The object discovery network takes in an image $f_t$, and outputs a set of $k$ feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$. This networks is an CNN-based network, and the last activation layer is a sigmoid function. Thus each mask can be interpreted as a segmentation mask that takes the value between 0-1. This slot-wise object representation is also used in ~\cite{kipf2019contrastive, locatello2020object}. Since it's a popular object representation in previous work, we adopt this in our implementation. \aq{I am afraid that if we say out method is also compatible with other object representations, reviewers are going to ask for results on other representations}
+The object discovery network $N_D$ takes in an image $f_t$, and outputs a set of $k$ feature maps $N_D(f_t) = m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$. This networks is an CNN-based network, and the last activation layer is a sigmoid function. Thus each mask can be interpreted as a slot-wise segmentation mask that takes the value between 0-1. This slot-wise object representation is also used in ~\cite{kipf2019contrastive, locatello2020object}. Since it's a popular object representation in previous work, we adopt this in our implementation. \aq{I am afraid that if we say out method is also compatible with other object representations, reviewers are going to ask for results on other representations}
 
 \subsection{Flow-guided Object Discovery Propagation}
+As mentioned above, we believe that motion information in nearby video frames contain critical training signal for object discovery tasks. More specifically, given two nearby video frames $f_{t}$ and $f_{t'}$, the optical flow defines a map between frames: $h_{t \rightarrow t'}(f_t) = f_{t'}$ and $h_{t' \rightarrow t}(f_{t'}) = f_{t}$. This map defines a morphism and we can use it to propagate object information from one frame to another:
+\[h_{t \rightarrow t'}(N_D(f_t)) = N_D(h_{t \rightarrow t'}(f_t))\],
+where $h_{t \rightarrow t'}(N_D(f_t)) = \overline{m_{t'}}$ and $ N_D(h_{t \rightarrow t'}(f_t)) =  N_D(f_{t'}) = m_{t'}$.
+
+If this morphism holds, then we know the following two conditions hold:  1) the map between frames($h_{t \rightarrow t'}$) is accurate, and 2) the object discovery feature maps are consistent across frames. The first condition is given by the precision of optical-flow prediction network. The second condition coincide with the training objective of our object discovery network. We next describe how to enforce this second condition via contrastive learning.
 
 \subsection{Contrastive Learning}
 
@@ -327,6 +332,23 @@ Metrics: 1) Slot Accuracy
     C-SWM not final &  &  0.45987  & 0.1717  &0.23062    \\
     Slot Contrastive final s4& 187.362204     & 0.098727525       & 0.05369954 & -\\
     Slot Attention &    \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}
+  \caption{Sample table title}
+  \label{sample-table}
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Simulated Control} \\
+    \cmidrule(r){2-5}  
+      & \textsc{flood}(Ours)      & C-SWM    & Slot Contrastive     & Slot Attention  \\
+    \midrule
+   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  & &      \\
+   \midrule
+    ARI$\uparrow$     &  0.5141849  & 0.398706  & - &   \\
     \bottomrule
   \end{tabular}
 \end{table}
