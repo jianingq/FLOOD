@@ -172,7 +172,7 @@ We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks
 
 \begin{figure}
   \centering
-  \includegraphics[width=8cm]{flood-network.pdf}
+  \includegraphics[width=8cm]{figs/flood-network.pdf}
 
   \caption{Sample figure caption.}
   \label{fig:architecture}
@@ -279,9 +279,10 @@ In robotics contexts, where motion is attributable to known robot actions, sever
 \subsection{Training and Evaluation Settings}
 \subsection{Baselines}
 
-Throughout our approach we use three approaches as baselines, representing three different types of object discovery objectives from the literature. First, contrastive structured world models (\textbf{C-SWM})~\cite{kipf2019contrastive} represents joint object discovery and environment dynamics modeling through a future prediction approach. Slot attention (\textbf{SA})~\cite{locatello2020object} represents methods that learn representations using image reconstruction losses. Finally, slot-contrastive network (\textbf{SCN})~\cite{racah2020slot} uses temporal continuity as a signal for object discovery: it trains representations that can distinguish far-away frame pairs from nearby frame pairs, using a contrastive loss.  
+Throughout our experiments, we compare against three baselines, representing three different types of object discovery objectives from the literature. First, contrastive structured world models (\textbf{C-SWM})~\cite{kipf2019contrastive} represents joint object discovery and environment dynamics modeling through a future prediction objective. Slot attention (\textbf{SA})~\cite{locatello2020object} represents object discovery through image reconstruction. Finally, slot-contrastive network (\textbf{SCN})~\cite{racah2020slot}, discussed above in Sec~\ref{sec:related_work}, uses temporal continuity for object discovery: like \textsc{flood}, it trains representations that can distinguish far-away frame pairs from nearby frame pairs using a contrastive loss, but it does not use optical flow correspondences between nearby frames.
+% as discussed in Sec~\ref{sec:related_work}
 
-All three baselines represent objects through a slot-based representation similar to \textsc{flood}, described in Sec~\ref{sec:approach}, making them well-suited for comparison. \textsc{flood} inherits the object encoder of C-SWM, which is also used in SCN. SA proposes a new attention-based architecture for encoding images into object slots.
+All three baselines represent objects through a slot-based representation similar to \textsc{flood}, described in Sec~\ref{sec:approach}, making them well-suited for direct comparison. \textsc{flood} inherits the object encoder of C-SWM, which is also used in SCN. SA proposes a new attention-based architecture for encoding images into object slots.
 
 %uses a new attention-based architecture to encode objects, and 
 
@@ -300,6 +301,13 @@ Metrics: 1) Slot Accuracy
 \textbf{Question 3.} Robustness to the number of slots?
 
 \jd{Prepare figures showing 1-2 nice examples for each dataset, perhaps a set of rows, where each row contains the input image, then the output masks of all baselines and our method for that image, similar to visualizations in papers like IODINE.}
+\subsection{Ablation}
+\begin{itemize}
+    \item sample efficiency
+    \item # slots v.s. performance
+    \item what happens when we have k slots, n > k objects in the dataset, but only m < k objects in each image?
+    \item item different ways to sample positive and negative
+\end{itemize}
 
 \begin{table}
   \caption{Sample table title}
@@ -311,9 +319,9 @@ Metrics: 1) Slot Accuracy
     \cmidrule(r){2-5}  
       & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
     \midrule
-   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  &286.178 &      \\
+   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  &286.178 &   -   \\
    \midrule
-    ARI$\uparrow$     &  0.5141849  & 0.398706  & - &   \\
+    ARI$\uparrow$     &  0.5967258  & 0.4878859  & - &  0.50066 \\
     \bottomrule
   \end{tabular}
 \end{table}
