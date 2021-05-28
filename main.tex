@@ -377,9 +377,13 @@ where $d(\cdot, \cdot)$ is a distance function between slot vectors, and $x^-$ a
 %\jd{Check this for inaccuracies}. 
 Recall that $x$ and $x'$ are temporally nearby frames, yet the positives above are not directly their corresponding slot vectors $\bm{z}(x)$ and $\bm{z}(x')$. Instead, the slots of $x$ are first warped through the optical flow warp to compute $\overline{\bm{z}(x')}$, as motivated in Sec~\ref{sec:flow}.
 
-This contrastive objective trivially precludes the all-zeros degenerate solution above. Avoiding the ``identity'' solution is more subtle: it is done by applying the contrastive loss to a compressed representation $z(x)=\mathcal{G}(\bm{m}(x))$, computed by a small MLP $\mathcal{G}$. The low capacity of $\mathcal{G}$ means that it should be very easy to extract a small code $z(x)$ that is sufficiently discriminative to minimize Eq~\ref{eq:flood_loss}. This forces the network to only represent only highly processed information in the masks $m^k$, thus avoiding the identity mapping $m^k(x)=x$. 
+This contrastive objective trivially precludes the all-zeros degenerate solution above. Avoiding the ``identity'' solution is more subtle: it is done by applying the contrastive loss to a compressed representation $\bm{z}=\mathcal{G}(\bm{m}(x))$, computed by a small MLP $\mathcal{G}$. The low capacity of $\mathcal{G}$ means that it should be very easy to extract a small code $\bm{z}$ that is sufficiently discriminative to minimize Eq~\ref{eq:flood_loss}. This forces the network to only represent only highly processed information in the masks $m^k$, thus avoiding the identity mapping $m^k(x)=x$. 
 
 \subsection{Network Implementation Detail}
+
+Lastly we describe some network implementation details. For the ``object extractor'' convolutional neural network $\mathcal{F}$, we use a four-layers convolutional neural network, each with a 3 x 3 kernel. The first three convolutional layers are followed by a relu and a batchnorm layer. The last convolutional layer is followed by a sigmoid, so that the predicted slot masks $\bm{m}(x)$ lie in $[0,1]$. 
+
+This convolutional neural network $\mathcal{F}$ is followed by a small multi-layer perceptron $\mathcal{G}$, that takes in slot masks $\bm{m}(x)$ and produced slot vectors $\bm{z}(x)$. $\mathcal{G}$ consists of three MLP layers, and another LayerNorm~\cite{LayerN} between the second and the third MLP layer. We use Adam optimizer and train this network on a single 2080Ti GPU with batch size of 1024. 
 
 
 %\jd{Need to talk about how both degenerate solutions are avoided?}
@@ -494,6 +498,7 @@ Note that SA does not produce slot vectors, so we omit its KLME in our quantitat
 %\subsection{Experiment Setup}
 
 \subsection{Results}
+Quantitative results are summarized in Table~\ref{table:objective} and Table~\ref{table:main-result}.
 \begin{figure}
   \centering
   \includegraphics[width=9cm]{figs/qual_sim.pdf}
@@ -536,8 +541,8 @@ Note that SA does not produce slot vectors, so we omit its KLME in our quantitat
 
 
 \begin{table}
-  \caption{Comparing the objective functions used for training object-structured representations \jd{bold-face all the winners in both tables}}
-  \label{sample-table}
+  \caption{Comparing the objective functions used for training object-structured representations}
+  \label{table:objective}
   \resizebox{\textwidth}{!}{
   \centering
   \begin{tabular}{llllll}
@@ -557,7 +562,7 @@ Note that SA does not produce slot vectors, so we omit its KLME in our quantitat
 
 \begin{table}
   \caption{Sample table title}
-  \label{sample-table}
+  \label{table:main-result}
   \centering
   \resizebox{\textwidth}{!}{
   \begin{tabular}{llllll}
