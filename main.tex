@@ -33,6 +33,8 @@
 \usepackage{soul}
 \usepackage{enumitem}
 \usepackage{bm}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \newcommand{\jd}[1]{\textcolor{orange}{[DJ: #1]}}
 \newcommand{\jdtext}[1]{\textcolor{red}{#1}}
 \newcommand{\aq}[1]{\textcolor{purple}{[AQ: #1]}}
@@ -175,25 +177,28 @@ We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks
 \section{Flow-guided object discovery}
 \label{sec:approach}
 
-\paragraph{Task setup and motivation.} First, we introduce the unsupervised object discovery setting. Given a collection of unlabeled training images $\mathcal{D}$ that specify a visual domain, object discovery approaches aim to automatically identify the objects present among those images. For example, given images of toys in varied configurations on a cluttered tabletop, we would like to automatically discover those toys. Discovery is typically expressed by spatially disentangling new images from that domain and assigning some or all pixels to various discovered objects and background.
+\paragraph{Task setup and motivation.} First, we introduce the unsupervised object discovery setting. Given a collection of unlabeled training images $\mathcal{D}$ that specify a visual domain, object discovery approaches aim to automatically identify the objects present among those images. For example, given images of toys in varied configurations on a cluttered tabletop, we would like to automatically discover those toys. Discovery is typically expressed by parsing or spatially disentangling new images from that domain and assigning some or all pixels to various discovered objects and background.
 %including new images not within the training dataset $\mathcal{D}$, into their constituent objects. 
 
-Object discovery is thus closely tied to the \emph{object-structured} representation in which the results of such image parsing are expressed, and training object discovery approaches amounts to learning unsupervised object-structured representations. Examples of such representations include keypoints~\cite{jakab2018unsupervised, Kulkarni2019UnsupervisedLO}, object detection bounding boxes (\jd{any examples of these??}), segmentation masks~\cite{greff2019multi, kipf2019contrastive}, and skeletons for articulated objects~\cite{jakab2020self}. As mentioned in Sec~\ref{sec:intro}, much research has focused on how to design innovative representations and infer them.
+Object discovery is thus closely tied to the \emph{object-structured} representation in which the results of such image parsing are expressed. Indeed, training object discovery approaches amounts to learning unsupervised object-structured representations. Examples of such representations include keypoints~\cite{jakab2018unsupervised, Kulkarni2019UnsupervisedLO}, object detection bounding boxes (\jd{any examples of these??}), segmentation masks~\cite{greff2019multi, kipf2019contrastive}, and skeletons capturing connected keypoints~\cite{jakab2020self}. As mentioned in Sec~\ref{sec:intro}, much research has focused on how to design innovative representations and infer them.
 
-Aside from having close correspondences with the \emph{true} objects in the scene, object-structured representations are designed to be compact, and spatially disentangle the image into composable and coherently moving components. These properties are useful in downstream tasks such as robotics: for example, to model how visual scenes respond to robot actions, object-structured representations permit compact models in terms of how discovered object components interact with the robot and with each other~\cite{minderer2019unsupervised, Kulkarni2019UnsupervisedLO, kipf2019contrastive, lambeta2020digit} (CITE Transporter, Minderer, DIGIT, C-SWM etc.).
+What are these representations useful for? Aside from having close correspondences with the \emph{true} objects in the scene, object-structured representations are designed to be compact, and to spatially disentangle the image into composable and coherently moving components. These properties are useful in downstream tasks such as robotics. For example, to model how visual scenes respond to robot actions, object-structured representations permit compact models in terms of how discovered object components interact with the robot and with each other~\cite{minderer2019unsupervised, Kulkarni2019UnsupervisedLO, kipf2019contrastive, lambeta2020digit} %(CITE Transporter, Minderer, DIGIT, C-SWM etc.).
 
 
 
  
 % re-composition (moving objects around to produce a new scene) (CITE) or spatial dynamics modeling.
 
+In the following subsections, we propose a new training objective for object discovery, that is different from prior approaches that largely rely on image reconstruction, action-conditioned future prediction, or contrasting images in the training dataset, as we will discuss in Sec~\ref{sec:related_work}. Our objective, \textsc{flood}, uniquely mines supervisory signals from motions occurring in a training dataset of videos.  
+% $\mathcal{D}$
 
-In the following subsections, we propose a new training objective for object discovery using motions in a dataset of videos $\mathcal{D}$. 
+\subsection{Slot representation and encoder} The \textsc{flood} training objective is not specific to any one representation, but we ground our discussion and notation using \emph{``slot''} segmentation masks and vectors as our object-structured representation. An input image $x$, of size $H \times W$ pixels, is represented through a collection of $K$ \emph{slot} masks $ \bm{m}(x) = \{m^1(x), m^2(x), \dots. m^K(x) \}$  of size $H\times W$. All mask values lie between $0$ and $1$, i.e., $0 < m^k(i, j) < 1$ for all masks $k$, and pixel positions $(i, j)$. Masks $m^k(x)$ are intended to represent segmentation masks for objects in $x$. Each slot mask is then summarized as a $D-$ dimensional slot vector $z^k(x)$. $\bm{z}(x)$ represents all $K$ slot vectors combined. In our work, each slot is free to bind to any object or background in the input image.\footnote{This is not true in \citet{kipf2019contrastive}, due to the requirement of object-specific actions for each slot.}
 
-\paragraph{Slot representation and encoder} While \textsc{flood} is not specific to any one representation, we will ground our discussion using segmentation \emph{slot} masks and slot vectors, which we also use in our experiments. An input image $x$ of size $H \times W$ is represented through a collection of $K$ segmentation masks $ \bm{m} = \{m^1, m^2, \dots. m^K \}$  of size $H\times W$, each of which is then summarized as a $D-$ dimensional slot vector $z^i$. All mask values lie between $0$ and $1$, i.e., $0 < m^k(i, j) < 1$ for all masks $k$, and pixel positions $(i, j)$.
+%What is the structure of the function that produces this representation? 
+How are these slot masks and vectors generated from input images? We use the popular neural network architecture proposed in \citet{kipf2019contrastive}. An ``object extractor'' convolutional neural network $\mathcal{F}$ with a sigmoid output layer produces $K$ convolutional maps constrained to lie in $[0, 1]$. These represent the slot masks $ \bm{m}(x)$. Next, a small multi-layer perceptron $\mathcal{G}$ processes each flattened slot mask to produce its corresponding slot vector: $z^k(x)$. This compression serves as a representational bottleneck that encourages the emergence of object-structured representations, as we will discuss below. The second and third rows of Fig~\ref{fig:architecture} illustrate this procedure.
 
-What is the structure of the function that produces this representation? We use the popular neural network architecture proposed in \citet{kipf2019contrastive}. An ``object extractor'' convolutional neural network $\mathcal{F}$ produces $K$ convolutional maps constrained to lie in $[0, 1]$ by a softmax activation function: these represent the slot masks $ \bm{m}(x) = \mathcal{F}(x)$. Next, a small multi-layer perceptron $\mathcal{G}$ processes each flattened slot mask to produce its corresponding slot vector: $z^k = \mathcal{G}(m^k)$. This compression serves as a representational bottleneck that forces the emergence of object-structured representations. The second and third rows of Fig~\ref{fig:architecture} illustrate this.
-
+% by a softmax activation functio
+%, which we also use in our experiments
  
 %The segmentation masks are of the same size as input images take values between $0$ and $1$, 
 
@@ -215,9 +220,56 @@ What is the structure of the function that produces this representation? We use 
 
 %\jd{Suggestion for how to structure this: First, set up the problem and notation. What is given to you, and what is the goal? Then describe the slot encoder architecture and how objects are represented in slots. Should state that this is the representation used in C-SWM and resembles the representations used in other work. Our method is also compatible with other object representations, but we use this popular representation in our implementations. Next, we describe the desired property of those representations in terms of pixelwise flow i.e. warp ( mask ( frame 1)) = mask ( warp (frame 1)), where  warp(frame 1) = frame 2, and the warp is computed from optical flow. Next, we describe how this can be implemented using contrastive losses.}
 
-\paragraph{Key idea: Coherent motion as a strong training signal. } An important characteristic of objects, known for long to be particularly useful for object grouping, is that objects move as coherent wholes, barring exceptions such as disintegration. This is captured in the Gestalt maxim~\cite{wertheimer1938laws}: ``pixels that move together group together.'' 
-We propose to use the coherent motions of objects as training signals for training $\mathcal{F}$ and $\mathcal{G}$ to perform object discovery. Specifically, we enforce the 
+\subsection{Optical flow, and how motions might help with object discovery} \label{sec:flow}
 
+An important characteristic of objects, known for long to be particularly useful for object grouping, is that objects move as coherent wholes. This idea has been known for at least a century, and is captured in the pithy Gestalt~\cite{wertheimer1938laws} phrase: ``pixels that move together group together.'' 
+%, barring rare exceptions such as disintegration
+
+Yet, to our knowledge, no existing object discovery methods use this information, including many that train on video sequences, such as~\cite{racah2020slot, jakab2018unsupervised, kipf2019contrastive}. %We too train on video sequences, but 
+We propose a novel approach to use the coherent motions of objects in training videos as training signals to guide %$\mathcal{F}$ and $\mathcal{G}$ to perform 
+object discovery. %We call this ``flow-guided object discovery''
+
+Our idea is illustrated in Fig~\ref{fig:desired_property}. Objects move as coherent wholes, and the objects in two neighboring images in video are the same, only (possibly) slightly displaced. Any object-structured representations, including our slot representation, should satisfy the following desiderata: \jd{could fold into text if need be, for space}
+\begin{itemize}[leftmargin=*]
+ \item Slots should bind to the same set of objects in both frames. 
+ \item Slots should be sensitive to the small changes in the \emph{positions} of those objects. In particular, each slot mask $m^k$ should exactly track the displacement of the object that it is bound to.
+\end{itemize}
+
+%\paragraph{The \textsc{flood} algorithm. } 
+To frame these desiderata as a mathematical objective, we introduce the concept of \emph{optical flow}. An optical flow field  $h_{a\rightarrow b}$ defines a warp between images $a$ and $b$, such that $b=h_{a\rightarrow b}(a)$ . In other words, $h_{a\rightarrow b}$ specifies a displacement for each pixel in $a$, such that the resulting image is equal to $b$. Optical flow computation is a well-studied problem in computer vision, and many mature solutions exist. We use FlowNet2.0~\cite{flownet2}, which is trained on four large synthetic datasets of animated object videos~\cite{flying3d, flyingchair,chairsd,sintel}. %\jd{like FlyingThings, or exactly FlyingThings?}
+%there are many existing off-the-shelf approaches for optical flow field computation. 
+%Note that the optical flow field is not unique, and indeed, video frames with large ``flat'' regions of the same color permit many compatible flow fields. 
+
+%We treat the optical flow field as 
+The optical flow field $h_{x\rightarrow x'}$ thus provides us with correspondences between pixels in $x$ and those in a temporally nearby frame $x'$.  
+%Given the optical flow field $h_{x\rightarrow x'}$, 
+Now, the desiderata for object-structured representations above boil down to stating that the pixel correspondences between neighboring frames $x$ and $x'$ are preserved in the correspondences between their slot masks $m^k(x)$ and $m^k(x')$. For all slot indices $k$:
+\begin{equation}
+    h_{x\rightarrow x'}(m^k(x)) = m^k(x'). \label{eq:desideratum}
+\end{equation}
+In other words, if $m^k(x)$ is a good segmentation mask for \emph{some} object in image $x$, then it maps to the next timestep through the same optical flow warp as the input images themselves. %Eq~\eqref{eq:desideratum} is the flow-guided object discovery (\textsc{flood}) desideratum. 
+
+%It is easy to see that how these masks map to the same 
+%Yet anothe way to state this is: (correct) segmentation is equivariant to object motion:  $h_{x\rightarrow x'}(m^k(x)) = m^k(h_{x\rightarrow x'}(x))$.
+
+%Or, the pixel correspondences between images are also correspondences between the slot masks.
+
+%$m^k(x)$
+
+%expressed for slot masks 
+This simple optical flow-based desideratum implicitly exploits the fact that objects in video move coherently, in ways that preserve their identity. To see this, observe that Eq~\eqref{eq:desideratum} is \emph{not} true for arbitrary warps $h$. For example, $h$ might move all pixels in $x$ by random displacements. In this case, the resulting image $x'$ would no longer plausibly retain the object identities present in $x$, and no slot masks $m^k(x')$ can be expected to preserve them either. Optical flow warps from natural videos are thus special, object identity-preserving warps.
+
+As a sidenote, in the above discussion, we have largely assumed that optical flow masks provide perfect pixel correspondences between the same real three-dimensional particle in nearby frames $x$ and $x'$. Optical flow methods, while very strong on the types of images we are interested in, do of course only produce noisy correspondences. However, as our experimental results validate, this is not a major concern.
+
+%\jd{Slightly uncomfortable about the fact that this all speaks of optical flow as if it provides some ground truth correspondence .. e.g. what happens if the illumination changes suddenly, and flow correspondences become weird? More broadly, should we say something about the fact that the correspondences are based on low-level appearance properties, and may only be noisy versions of the true 3D point correspondences?}
+
+%Thus, the above mathematical statement of the desiderata exploits the fact that objects move coherently, in ways that preserve their identity. 
+
+%Note that this is not true for arbitrary wraps of the inputs
+
+%In other words, the segmentation mask 
+
+%Objects move as coherent wholes, therefore motions in natural video sequences preserve the object structure of the images, modulo minor boundary and occlusion effects. We identify the following simple desideratum for good discovered object-structured image representations such as the segmentation masks depicted here: object representations for nearby images in a video stream must be related to each other through the \emph{same optical flow masks} as the images themselves.
 
 %Specifically, while prior work has trained OS representations from objectives 
 
@@ -227,26 +279,50 @@ We propose to use the coherent motions of objects as training signals for traini
 
 %Given some unlabeled video sequences, the goal of our method is to discover and learn object-centric representations with the help of motion information. Specifically, \textsc{flood} takes in an image input $f_t$, which is the video frame at time step $t$, and passing it through an object discovery network. This discovery network produces a set of feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$ around the discovered objects, where $k$ is the number of objects we expected. 
 
-In order to take advantages of the motion information available in a video, \textsc{flood} takes in motion information provided by optical flow between two nearby frames $f_{t}$ and $f_{t'}$, and propagates the predicted feature maps $m_{t}$ to $\overline{m_{t'}}$. If the optical flow between these two frames are correct, we should expect that $\overline{m_{t'}}$ and $m_{t'}$ encodes the same object information. We could then use this property to train our object discovery network.
+% In order to take advantages of the motion information available in a video, \textsc{flood} takes in motion information provided by optical flow between two nearby frames $f_{t}$ and $f_{t'}$, and propagates the predicted feature maps $m_{t}$ to $\overline{m_{t'}}$. If the optical flow between these two frames are correct, we should expect that $\overline{m_{t'}}$ and $m_{t'}$ encodes the same object information. We could then use this property to train our object discovery network.
 
-In this section, we first introduce our object discovery network. Next we describe our desired property of the learned representations in terms of optical flow. In the end we explain how to use these desired properties to train the object discovery network through contrastive learning. 
+% In this section, we first introduce our object discovery network. Next we describe our desired property of the learned representations in terms of optical flow. In the end we explain how to use these desired properties to train the object discovery network through contrastive learning. 
 
-\subsection{Object-structured representation}
-The object discovery network $N_D$ takes in an image $f_t$, and outputs a set of $k$ feature maps $N_D(f_t) = m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$. This networks is an CNN-based network, and the last activation layer is a sigmoid function. Thus each mask can be interpreted as a slot-wise segmentation mask that takes the value between 0-1. This slot-wise object representation is also used in ~\cite{kipf2019contrastive, locatello2020object}. Since it's a popular object representation in previous work, we adopt this in our implementation. \aq{I am afraid that if we say out method is also compatible with other object representations, reviewers are going to ask for results on other representations}
+% \subsection{Object-structured representation}
+% The object discovery network $N_D$ takes in an image $f_t$, and outputs a set of $k$ feature maps $N_D(f_t) = m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$. This networks is an CNN-based network, and the last activation layer is a sigmoid function. Thus each mask can be interpreted as a slot-wise segmentation mask that takes the value between 0-1. This slot-wise object representation is also used in ~\cite{kipf2019contrastive, locatello2020object}. Since it's a popular object representation in previous work, we adopt this in our implementation. \aq{I am afraid that if we say out method is also compatible with other object representations, reviewers are going to ask for results on other representations}
 
-\subsection{Flow-guided object discovery propagation}
-As mentioned above, we believe that motion information in nearby video frames contain critical training signal for object discovery tasks. More specifically, given two nearby video frames $f_{t}$ and $f_{t'}$, the optical flow defines a map between frames: $h_{t \rightarrow t'}(f_t) = f_{t'}$ and $h_{t' \rightarrow t}(f_{t'}) = f_{t}$. This map defines a morphism and we can use it to propagate object information from one frame to another:
-\[h_{t \rightarrow t'}(N_D(f_t)) = N_D(h_{t \rightarrow t'}(f_t))\],
-where $h_{t \rightarrow t'}(N_D(f_t)) = \overline{m_{t'}}$ and $ N_D(h_{t \rightarrow t'}(f_t)) =  N_D(f_{t'}) = m_{t'}$.
+% \subsection{Flow-guided object discovery propagation}
+% As mentioned above, we believe that motion information in nearby video frames contain critical training signal for object discovery tasks. More specifically, given two nearby video frames $f_{t}$ and $f_{t'}$, the optical flow defines a map between frames: $h_{t \rightarrow t'}(f_t) = f_{t'}$ and $h_{t' \rightarrow t}(f_{t'}) = f_{t}$. This map defines a morphism and we can use it to propagate object information from one frame to another:
+% \[h_{t \rightarrow t'}(N_D(f_t)) = N_D(h_{t \rightarrow t'}(f_t))\],
+% where $h_{t \rightarrow t'}(N_D(f_t)) = \overline{m_{t'}}$ and $ N_D(h_{t \rightarrow t'}(f_t)) =  N_D(f_{t'}) = m_{t'}$.
 
-If this morphism holds, then we know the following two conditions hold:  1) the map between frames($h_{t \rightarrow t'}$) is accurate, and 2) the object discovery feature maps are consistent across frames. The first condition is given by the precision of optical-flow prediction network. The second condition coincide with the training objective of our object discovery network. We next describe how to enforce this second condition via contrastive learning.
+% If this morphism holds, then we know the following two conditions hold:  1) the map between frames($h_{t \rightarrow t'}$) is accurate, and 2) the object discovery feature maps are consistent across frames. The first condition is given by the precision of optical-flow prediction network. The second condition coincide with the training objective of our object discovery network. We next describe how to enforce this second condition via contrastive learning.
 
-\subsection{Contrastive training}
-Our general goal is to make sure that object representations $m_t$ from different frames are consistent with each other, i.e. that each slot of the learned feature map should represent a consistent object. In order to achieve this goal, we first propagate the learned feature map of frame $t$ into a nearby frame $t'$: $\overline{m_{t'}} = h_{t \rightarrow t'}(N_D(f_t))$. Next we want to enforce the consistency on $\overline{m_{t'}}$ and $m_{t'}$. Doing so directly on feature maps would be too costly, thus we encode the learned feature maps $m_t$ using an 3-layer MLP $N_E$ into a latent embedding $z_t$. Finally we formalize our goal in a constrastive learning objective:
-\[\pmb{L} = d(N_E(m_{t'}),N_E(\overline{m_{t'}}))\]
+\subsection{The \textsc{flood} training objective}
+
+%In targeting the desiderata of Eq~\ref{eq:desideratum}, there are two degenerate solutions we would like to avoid
+Eq~\eqref{eq:desideratum} cannot directly be set up as a training objective, since it permits two degenerate solutions: $m^k(x)=\bm{0}$ for all $x, k$, (``all-zeros'' ), and  $m^k(x)=x$ for all $x$ (``identity''). We avoid these by defining a contrastive training objective over the slot vectors $\bm{z}(x) = \mathcal{G}(\bm{m}(x))$. 
+
+%Following the success of contrastive objectives for unsupervised representation learning (CITE CPC, SIMCLR etc.), we set up a contrastive objective to achieve Eq~\ref{eq:desideratum}. % using contrastive objectives 
+
+Let $\overline{\bm{m}(x')} \triangleq h_{x \rightarrow x'}(\bm{m}(x))$ represent the prediction of the slot mask $\bm{m}(x')$ obtained by flow-warping $\bm{m}(x)$. Note that this is the LHS of Eq~\eqref{eq:desideratum}, combined over all slot indices $k$.  Now, let $\overline{\bm{z}(x')}=\mathcal{G}(\overline{\bm{m}(x')})$ represent its corresponding predicted slot vectors. 
+
+Then, the flow-guided object discovery (\textsc{flood}) objective is:
+\begin{equation}
+\mathcal{L} = \exp \dfrac {d(\overline{\bm{z}(x')}, \bm{z}(x'))}{\sum_{x^-} d(\bm{z}(x), \bm{z}(x^-)}, \label{eq:flood_loss}
+\end{equation}
+where $d(\cdot, \cdot)$ is a distance function between slot vectors, and $x^-$ are negatives for $x$. We set $d$ to be the summed $\ell_2$ error over slots, and the negative frames $x^-$ are uniformly drawn from frames that are more than $T=1$ steps away from the current frame $x$ in the training videos. \jd{Check this for inaccuracies}. Recall that $x$ and $x'$ are temporally nearby frames, yet the positives above are not directly their corresponding slot vectors $\bm{z}(x)$ and $\bm{z}(x')$. Instead, the slots of $x$ are first warped through the optical flow warp to compute $\overline{\bm{z}(x')}$, as motivated in Sec~\ref{sec:flow}.
+
+The contrastive objective trivially precludes the all-zeros degenerate solution above. Avoiding the ``identity'' solution is more subtle: it is done by applying the contrastive loss to a compressed representation $z(x)=\mathcal{G}(\bm{m}(x))$, computed by a small MLP $\mathcal{G}$. The low capacity of $\mathcal{G}$ means that it should be very easy to extract a small code $z(x)$ that is sufficiently discriminative. This forces the network to only represent only highly processed information in the masks $m^k$, thus avoiding the identity. 
+
+%\jd{Need to talk about how both degenerate solutions are avoided?}
+
+% \jd{needs to be written out as a softmax over positives and negatives}
+
+%combined LHS in Eq~\ref{eq:desideratum} for all mask indices $k$
+
+%Our general goal is to make sure that object representations $m_t$ from different frames are consistent with each other, i.e. that each slot of the learned feature map should represent a consistent object. 
+% In order to achieve this goal, we first propagate the learned feature map of frame $t$ into a nearby frame $t'$: $\overline{m_{t'}} = h_{t \rightarrow t'}(N_D(f_t))$. Next we want to enforce the consistency on $\overline{m_{t'}}$ and $m_{t'}$. Doing so directly on feature maps would be too costly, thus we encode the learned feature maps $m_t$ using an 3-layer MLP $N_E$ into a latent embedding $z_t$. Finally we formalize our goal in a constrastive learning objective:
+% \[\mathcal{L} = d(N_E(m_{t'}),N_E(\overline{m_{t'}}))\]
 
 \subsection{Implementation details}
-A paragraph on implementation details somewhere. 
+
+\jd{Fill in things like architecture etc. here.}
 
 \section{Related Prior Work}
 \label{sec:related_work}
