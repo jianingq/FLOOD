@@ -26,10 +26,13 @@
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
+\usepackage{rotating}
+\usepackage{multirow}
 %\usepackage{natbib}
 \usepackage{graphicx}
 \usepackage{soul}
 \usepackage{enumitem}
+\usepackage{bm}
 \newcommand{\jd}[1]{\textcolor{orange}{[DJ: #1]}}
 \newcommand{\jdtext}[1]{\textcolor{red}{#1}}
 \newcommand{\aq}[1]{\textcolor{purple}{[AQ: #1]}}
@@ -111,7 +114,7 @@
 
 The information content in complex visual scenes often boils down to the properties and configurations of a small number of objects within them. This makes objects a natural representational basis for visual perception. Indeed, human adults experience their visual world as consisting largely of overlapping objects at various distances that are stable across space and time. The origins of such an object-based experience of raw sensory inputs has occupied and intrigued cognitive scientists for over a century~\cite{wertheimer1912experimentelle, wertheimer1938laws, spelke1990principles, spelke1992origins, johnson2010infants, spelke2007core}.% (CITE Gestalt, etc). 
 
-Artificial intelligence researchers have also asked similar questions about how machines might parse image inputs into objects, often motivated by the need to represent high-resolution images compactly yet sufficiently comprehensively for various applications. In particular, many recent efforts have studied ``unsupervised object discovery'', the task of automatically identifying the objects in a visual domain represented by an unlabeled dataset of images or videos, and then encoding any new input images from that domain into an object-structured representation that expresses the presence, configurations, and relations of those identified objects. 
+Artificial intelligence researchers have also asked similar questions about how machines might parse image inputs into objects, often motivated by the need to represent high-resolution images compactly yet sufficiently comprehensively for various applications. State-of-the-art approaches for classic computer vision tasks such as object detection and segmentation focus on learning to perform these tasks with manual object annotations. However, many recent efforts have focused on \emph{unsupervised object discovery}, the task of automatically identifying the objects in a visual domain represented by an unlabeled dataset of images or videos, and then encoding any new input images from that domain into an object-structured representation that expresses the presence, configurations, and relations of those identified objects. 
 
 %without omitting the most pertinent information 
 
@@ -123,16 +126,18 @@ Exciting progress in unsupervised object discovery has come through introducing 
 
 %, identifying correspondences between pixels in consecutive frames
 
-Consequently, much research has focused on designing network architectures to produce object-structured representations~\cite{jakab2018unsupervised,jakab2020self,Kulkarni2019UnsupervisedLO,lowe2020learning,locatello2020object,crawford2019spatially}, and corresponding inference mechanisms~\cite{eslami2016attend, greff2019multi, engelcke2019genesis}. Our contribution is orthogonal to these efforts: we focus on the fundamental problem of identifying useful signals for object discovery, and designing objective functions that correctly exploit those signals. In particular, we call back to the Gestalt idea~\cite{wertheimer1938laws} that \emph{motion} contains information critical for correctly grouping object pixels together. Indeed, a large and mature literature on motion segmentation approaches in computer vision~\cite{tron2007benchmark,yan2006general,keuper2018motion,bideau2018moa, yang2021rigidmask} attests to the utility of tracking the image plane motions of pixels, i.e., ``optical flow'', for identifying coherently moving objects in video --- pixels that move together belong together.
+Consequently, much research has focused on designing network architectures to produce object-structured representations~\cite{jakab2018unsupervised,jakab2020self,Kulkarni2019UnsupervisedLO,lowe2020learning,locatello2020object,crawford2019spatially}, and corresponding inference mechanisms~\cite{eslami2016attend, greff2019multi, engelcke2019genesis}. Our contribution is orthogonal to these efforts: we focus on the fundamental problem of identifying useful signals for object discovery, and designing improved objective functions that correctly exploit those signals. In particular, we call back to the Gestalt idea~\cite{wertheimer1938laws} that \emph{motion} contains information critical for correctly grouping object pixels together. Indeed, a large and mature literature on motion segmentation approaches in computer vision~\cite{tron2007benchmark,yan2006general,keuper2018motion,bideau2018moa, yang2021rigidmask} attests to the utility of tracking the image plane motions of pixels, i.e., ``optical flow'', for identifying moving objects in video --- pixels that coherently move together belong together.
 
-We show how these ideas extend to unsupervised neural object discovery. Our technique is simple: we compute optical flows on unlabeled videos using off-the-shelf approaches. Then, we train our object encoder to produce representations for nearby frames that are consistent with the optical flow-provided correspondences between those same frames. Our objective function takes the form of a modified contrastive loss. We call this technique \textsc{flood} (``\ul{Flo}w-guided \ul{o}bject \ul{d}iscovery''). 
+We show how these ideas extend to unsupervised neural object discovery. Our technique is simple: we compute optical flows on unlabeled videos using off-the-shelf approaches. Then, we train our object encoder to produce representations for nearby frames that are consistent with the optical flow-provided correspondences between those same frames. Our objective function takes the form of a modified contrastive loss. We call this technique \textsc{flood} (``\ul{Flo}w-guided \ul{o}bject \ul{d}iscovery''). This idea is illustrated in Fig~\ref{fig:desired_property}.
 
 \begin{figure}
     \centering
     \includegraphics[width=8cm]{flood_main_figure.pdf}
-    \caption{\jd{Introducing the idea that an optical flow warp applied to an object-structured representation should produce the object-structured representation of the next image}}
+    \caption{Objects move as coherent wholes, therefore motions in natural video sequences preserve the object structure of the images, modulo minor boundary and occlusion effects. We identify the following simple desideratum for good discovered object-structured image representations such as the segmentation masks depicted here: object representations for nearby images in a video stream must be related to each other through the \emph{same optical flow masks} as the images themselves.}
     \label{fig:desired_property}
 \end{figure}
+%when objects move in an image stream generating a corresponding optical flow map between consecutive images, t
+%Introducing the idea that an optical flow warp applied to an object-structured representation should produce the object-structured representation of the next image
 
 We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks used in previous works. In addition, we introduce a real-world tabletop robotic object pushing dataset. Our results show that \textsc{flood} yields reliable improvements over baseline methods based on reconstruction and contrastive losses, and even an approach that has access to additional information about the forces causing object motions in video.
 
@@ -167,41 +172,80 @@ We evaluate \textsc{flood} on a variety of synthetic object discovery benchmarks
 
 
 
-\section{Flow-guided Object Discovery}
+\section{Flow-guided object discovery}
 \label{sec:approach}
+
+\paragraph{Task setup and motivation.} First, we introduce the unsupervised object discovery setting. Given a collection of unlabeled training images $\mathcal{D}$ that specify a visual domain, object discovery approaches aim to automatically identify the objects present among those images. For example, given images of toys in varied configurations on a cluttered tabletop, we would like to automatically discover those toys. Discovery is typically expressed by spatially disentangling new images from that domain and assigning some or all pixels to various discovered objects and background.
+%including new images not within the training dataset $\mathcal{D}$, into their constituent objects. 
+
+Object discovery is thus closely tied to the \emph{object-structured} representation in which the results of such image parsing are expressed, and training object discovery approaches amounts to learning unsupervised object-structured representations. Examples of such representations include keypoints~\cite{jakab2018unsupervised, Kulkarni2019UnsupervisedLO}, object detection bounding boxes (\jd{any examples of these??}), segmentation masks~\cite{greff2019multi, kipf2019contrastive}, and skeletons for articulated objects~\cite{jakab2020self}. As mentioned in Sec~\ref{sec:intro}, much research has focused on how to design innovative representations and infer them.
+
+Aside from having close correspondences with the \emph{true} objects in the scene, object-structured representations are designed to be compact, and spatially disentangle the image into composable and coherently moving components. These properties are useful in downstream tasks such as robotics: for example, to model how visual scenes respond to robot actions, object-structured representations permit compact models in terms of how discovered object components interact with the robot and with each other~\cite{minderer2019unsupervised, Kulkarni2019UnsupervisedLO, kipf2019contrastive, lambeta2020digit} (CITE Transporter, Minderer, DIGIT, C-SWM etc.).
+
+
+
+ 
+% re-composition (moving objects around to produce a new scene) (CITE) or spatial dynamics modeling.
+
+
+In the following subsections, we propose a new training objective for object discovery using motions in a dataset of videos $\mathcal{D}$. 
+
+\paragraph{Slot representation and encoder} While \textsc{flood} is not specific to any one representation, we will ground our discussion using segmentation \emph{slot} masks and slot vectors, which we also use in our experiments. An input image $x$ of size $H \times W$ is represented through a collection of $K$ segmentation masks $ \bm{m} = \{m^1, m^2, \dots. m^K \}$  of size $H\times W$, each of which is then summarized as a $D-$ dimensional slot vector $z^i$. All mask values lie between $0$ and $1$, i.e., $0 < m^k(i, j) < 1$ for all masks $k$, and pixel positions $(i, j)$.
+
+What is the structure of the function that produces this representation? We use the popular neural network architecture proposed in \citet{kipf2019contrastive}. An ``object extractor'' convolutional neural network $\mathcal{F}$ produces $K$ convolutional maps constrained to lie in $[0, 1]$ by a softmax activation function: these represent the slot masks $ \bm{m}(x) = \mathcal{F}(x)$. Next, a small multi-layer perceptron $\mathcal{G}$ processes each flattened slot mask to produce its corresponding slot vector: $z^k = \mathcal{G}(m^k)$. This compression serves as a representational bottleneck that forces the emergence of object-structured representations. The second and third rows of Fig~\ref{fig:architecture} illustrate this.
+
+ 
+%The segmentation masks are of the same size as input images take values between $0$ and $1$, 
+
+%Specifically, \textsc{flood} takes in an image input $f_t$, which is the video frame at time step $t$, and passing it through an object discovery network. This discovery network produces a set of feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$ around the discovered objects, where $k$ is the number of objects we expected. 
+
+
+
+%At a high level, all unsupervised object discovery approaches aim to produce representations that are: compact, spatially disentangled, interpretable, permit composition (CITE IODINE/MoNET, and the GAN papers) and spatial reasoning. This in turn can be useful for downstream applications such as robotics, in modeling how visual scenes respond to robot actions simply through modeling the responses of discovered objects. (CITE Transporter, Minderer, DIGIT, C-SWM etc.) 
+
+%This identification is typically expressed through a simple 
 
 \begin{figure}
   \centering
-  \includegraphics[width=8cm]{figs/flood-network.pdf}
+  \includegraphics[width=14cm]{figs/flood-network.pdf}
 
   \caption{Sample figure caption.}
   \label{fig:architecture}
 \end{figure}
 
-\jd{Suggestion for how to structure this: First, set up the problem and notation. What is given to you, and what is the goal? Then describe the slot encoder architecture and how objects are represented in slots. Should state that this is the representation used in C-SWM and resembles the representations used in other work. Our method is also compatible with other object representations, but we use this popular representation in our implementations. Next, we describe the desired property of those representations in terms of pixelwise flow i.e. warp ( mask ( frame 1)) = mask ( warp (frame 1)), where  warp(frame 1) = frame 2, and the warp is computed from optical flow. Next, we describe how this can be implemented using contrastive losses.}
+%\jd{Suggestion for how to structure this: First, set up the problem and notation. What is given to you, and what is the goal? Then describe the slot encoder architecture and how objects are represented in slots. Should state that this is the representation used in C-SWM and resembles the representations used in other work. Our method is also compatible with other object representations, but we use this popular representation in our implementations. Next, we describe the desired property of those representations in terms of pixelwise flow i.e. warp ( mask ( frame 1)) = mask ( warp (frame 1)), where  warp(frame 1) = frame 2, and the warp is computed from optical flow. Next, we describe how this can be implemented using contrastive losses.}
+
+\paragraph{Key idea: Coherent motion as a strong training signal. } An important characteristic of objects, known for long to be particularly useful for object grouping, is that objects move as coherent wholes, barring exceptions such as disintegration. This is captured in the Gestalt maxim~\cite{wertheimer1938laws}: ``pixels that move together group together.'' 
+We propose to use the coherent motions of objects as training signals for training $\mathcal{F}$ and $\mathcal{G}$ to perform object discovery. Specifically, we enforce the 
 
 
-Given some unlabeled video sequences, the goal of our method is to discover and learn object-centric representations with the help of motion information. Specifically, \textsc{flood} takes in an image input $f_t$, which is the video frame at time step $t$, and passing it through an object discovery network. This discovery network produces a set of feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$ around the discovered objects, where $k$ is the number of objects we expected. 
+%Specifically, while prior work has trained OS representations from objectives 
+
+%~\cite{tron2007benchmark,yan2006general,keuper2018motion,bideau2018moa, yang2021rigidmask}
+
+%A natural way to collect the training image dataset $\mathcal{D}$ is to gather images from the frames of video. 
+
+%Given some unlabeled video sequences, the goal of our method is to discover and learn object-centric representations with the help of motion information. Specifically, \textsc{flood} takes in an image input $f_t$, which is the video frame at time step $t$, and passing it through an object discovery network. This discovery network produces a set of feature maps $m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$ around the discovered objects, where $k$ is the number of objects we expected. 
 
 In order to take advantages of the motion information available in a video, \textsc{flood} takes in motion information provided by optical flow between two nearby frames $f_{t}$ and $f_{t'}$, and propagates the predicted feature maps $m_{t}$ to $\overline{m_{t'}}$. If the optical flow between these two frames are correct, we should expect that $\overline{m_{t'}}$ and $m_{t'}$ encodes the same object information. We could then use this property to train our object discovery network.
 
 In this section, we first introduce our object discovery network. Next we describe our desired property of the learned representations in terms of optical flow. In the end we explain how to use these desired properties to train the object discovery network through contrastive learning. 
 
-\subsection{Object Discovery Network}
+\subsection{Object-structured representation}
 The object discovery network $N_D$ takes in an image $f_t$, and outputs a set of $k$ feature maps $N_D(f_t) = m_t = \{m_{t}^1, m_{t}^2, \dots. m_{t}^k \}$. This networks is an CNN-based network, and the last activation layer is a sigmoid function. Thus each mask can be interpreted as a slot-wise segmentation mask that takes the value between 0-1. This slot-wise object representation is also used in ~\cite{kipf2019contrastive, locatello2020object}. Since it's a popular object representation in previous work, we adopt this in our implementation. \aq{I am afraid that if we say out method is also compatible with other object representations, reviewers are going to ask for results on other representations}
 
-\subsection{Flow-guided Object Discovery Propagation}
+\subsection{Flow-guided object discovery propagation}
 As mentioned above, we believe that motion information in nearby video frames contain critical training signal for object discovery tasks. More specifically, given two nearby video frames $f_{t}$ and $f_{t'}$, the optical flow defines a map between frames: $h_{t \rightarrow t'}(f_t) = f_{t'}$ and $h_{t' \rightarrow t}(f_{t'}) = f_{t}$. This map defines a morphism and we can use it to propagate object information from one frame to another:
 \[h_{t \rightarrow t'}(N_D(f_t)) = N_D(h_{t \rightarrow t'}(f_t))\],
 where $h_{t \rightarrow t'}(N_D(f_t)) = \overline{m_{t'}}$ and $ N_D(h_{t \rightarrow t'}(f_t)) =  N_D(f_{t'}) = m_{t'}$.
 
 If this morphism holds, then we know the following two conditions hold:  1) the map between frames($h_{t \rightarrow t'}$) is accurate, and 2) the object discovery feature maps are consistent across frames. The first condition is given by the precision of optical-flow prediction network. The second condition coincide with the training objective of our object discovery network. We next describe how to enforce this second condition via contrastive learning.
 
-\subsection{Contrastive Learning}
+\subsection{Contrastive training}
 Our general goal is to make sure that object representations $m_t$ from different frames are consistent with each other, i.e. that each slot of the learned feature map should represent a consistent object. In order to achieve this goal, we first propagate the learned feature map of frame $t$ into a nearby frame $t'$: $\overline{m_{t'}} = h_{t \rightarrow t'}(N_D(f_t))$. Next we want to enforce the consistency on $\overline{m_{t'}}$ and $m_{t'}$. Doing so directly on feature maps would be too costly, thus we encode the learned feature maps $m_t$ using an 3-layer MLP $N_E$ into a latent embedding $z_t$. Finally we formalize our goal in a constrastive learning objective:
 \[\pmb{L} = d(N_E(m_{t'}),N_E(\overline{m_{t'}}))\]
 
-\subsection{Implementation Detail}
+\subsection{Implementation details}
 A paragraph on implementation details somewhere. 
 
 \section{Related Prior Work}
@@ -221,7 +265,7 @@ A paragraph on implementation details somewhere.
 %this is not a problem because they do not aim to train a segmentation model. Rather, 
 
 
-\paragraph{Neural object discovery.} Nearly all neural object discovery approaches targeting general images or video are trained by reconstructing the input image~\cite{jakab2018unsupervised,jakab2020self,greff2019multi, burgess2019monet,locatello2020object,Kulkarni2019UnsupervisedLO, minderer2019unsupervised, engelcke2019genesis}, but two recent approaches are trained through contrastive losses to distinguish between distinct images in a dataset~\cite{racah2020slot,lowe2020learning}. \citet{racah2020slot} use temporal continuity in video for object discovery, in a method called slot-contrastive networks (SCN). Like \textsc{flood}, SCN uses temporally nearby frames as positives and distant frames as negatives, but it effectively treats nearby images as being identical since it does not account for pixel motions. Instead, as specified above, \textsc{flood} models nearby frames as related by a warp specified by optical flow. We compare against SCN in Sec~\ref{sec:experiments}.  %also uses a loss from the contrastive family, but guided by optical flow. 
+\paragraph{Neural object discovery.} Nearly all neural object discovery approaches targeting general images or video are trained by reconstructing the input image~\cite{jakab2018unsupervised,jakab2020self,greff2019multi, burgess2019monet,locatello2020object,Kulkarni2019UnsupervisedLO, minderer2019unsupervised, engelcke2019genesis}. Some approaches use adversarial training: the idea is that object-structured representations can be modified and recomposed into valid images~\cite{chen2019unsupervised, yang2020learning}. Two recent approaches are trained through contrastive losses to distinguish between distinct images in a dataset~\cite{racah2020slot,lowe2020learning}. Among these, \citet{racah2020slot} use temporal continuity in video for object discovery, in a method called slot-contrastive networks (SCN). Like \textsc{flood}, SCN uses temporally nearby frames as positives and distant frames as negatives, but it effectively treats nearby images as being identical since it does not account for pixel motions. Instead, as specified above, \textsc{flood} models nearby frames as related by a warp specified by optical flow. We compare against SCN in Sec~\ref{sec:experiments}.  %also uses a loss from the contrastive family, but guided by optical flow. 
 
 In robotics contexts, where motion is attributable to known robot actions, several models~\cite{kipf2019contrastive, kipf2018neural, Veerapaneni2019EntityAI}, \jd{Aurora, could you look into the Veerapaneni paper?} use action-conditioned future prediction as a training objective for joint object discovery and environment dynamics modeling. The robot actions in these formulations help specify how the scenes in training videos evolve over time. \textsc{flood} replaces robot actions with dense pixel correspondences from optical flow, which are more general --- they specify how arbitrary videos evolve even with unknown actors and forces. Notably, our implementation of \textsc{flood} uses the popular object slot encoder architecture of contrastive structured world models (C-SWM)~\cite{kipf2019contrastive}, enabling a controlled comparison in Sec~\ref{sec:experiments}. With identical object encoders, and sans robot action knowledge, \textsc{flood} still performs comparably or better than C-SWM even in robotics datasets with known actions.
 
@@ -303,25 +347,28 @@ Metrics: 1) Slot Accuracy
 \jd{Prepare figures showing 1-2 nice examples for each dataset, perhaps a set of rows, where each row contains the input image, then the output masks of all baselines and our method for that image, similar to visualizations in papers like IODINE.}
 \subsection{Ablation}
 \begin{itemize}
+    \item same C-SWM architecture: compare our flow-guided contrastive objective to C-SWM's objective (already there), SCN's temporal continuity objective, and standard reconstruction objective.
+    \item Qualitative analysis / failure examples 
     \item sample efficiency
-    \item # slots v.s. performance
+    \item \#slots v.s. performance
     \item what happens when we have k slots, n > k objects in the dataset, but only m < k objects in each image?
-    \item item different ways to sample positive and negative
+    \item different ways to sample positive and negative
 \end{itemize}
 
+\setlength{\tabcolsep}{20pt}
+\renewcommand{\arraystretch}{1.5}
 \begin{table}
-  \caption{Sample table title}
+  \caption{Comparing the objective functions used for training object-structured representations}
   \label{sample-table}
   \centering
-  \begin{tabular}{lllll}
+  \begin{tabular}{llllll}
     \toprule
-    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Simulated Control} \\
-    \cmidrule(r){2-5}  
-      & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{dynamics modeling}    & \textbf{temporal continuity}     & \textbf{reconstruction}  \\
+    \cmidrule(r){2-6}
+     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &286.178 &   -   \\
+    \cmidrule(r){2-6}
+    & \textbf{ARI$\uparrow$}     &  0.5967258  & 0.4878859  & - &  0.50066 \\
     \midrule
-   MSE(Points)$\downarrow$  & 100.86089 &  99.6055  &286.178 &   -   \\
-   \midrule
-    ARI$\uparrow$     &  0.5967258  & 0.4878859  & - &  0.50066 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -331,12 +378,42 @@ Metrics: 1) Slot Accuracy
   \caption{Sample table title}
   \label{sample-table}
   \centering
+  \begin{tabular}{llllll}
+    \toprule
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
+    \cmidrule(r){2-6}
+     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &286.178 &   -   \\
+    \cmidrule(r){2-6}
+     & \textbf{ARI$\uparrow$}     &  0.5967258  & 0.4878859  & - &  0.50066 \\
+    \midrule
+    
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{REAL}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
+    \cmidrule(r){2-6}
+     & \textbf{MSE(Points)$\downarrow$} & 786.482287& 830.339&  806.727197   &   -   \\
+    \cmidrule(r){2-6}
+    &\textbf{ARI$\uparrow$}      & 0.1685787  &  0.1596932  & - &    \\
+    \midrule
+    
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{CUBES}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
+    \cmidrule(r){2-6}
+      & \textbf{MSE(Points)$\downarrow$}  & 59.92 &  54.79  &  &   -   \\
+    \cmidrule(r){2-6}
+    &\textbf{ARI$\uparrow$}      &  &    & - &   \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{comment}
+\begin{table}
+  \caption{Sample table title}
+  \label{sample-table}
+  \centering
   \begin{tabular}{lllll}
     \toprule
     \multicolumn{1}{c}{} & \multicolumn{4}{c}{Real Control} \\
     \cmidrule(r){2-5}  
       & \textsc{flood}(Ours)      & C-SWM    & SCN     & SA  \\
-    \midrule
+    \cmidrule(r){2-5}
    MSE(Points)$\downarrow$  &   &  786.482287   & 806.727197&      \\
    \midrule
     ARI$\uparrow$     & 0.1685787  &  0.1596932  & - &   \\
