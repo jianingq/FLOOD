@@ -320,9 +320,6 @@ The contrastive objective trivially precludes the all-zeros degenerate solution 
 % In order to achieve this goal, we first propagate the learned feature map of frame $t$ into a nearby frame $t'$: $\overline{m_{t'}} = h_{t \rightarrow t'}(N_D(f_t))$. Next we want to enforce the consistency on $\overline{m_{t'}}$ and $m_{t'}$. Doing so directly on feature maps would be too costly, thus we encode the learned feature maps $m_t$ using an 3-layer MLP $N_E$ into a latent embedding $z_t$. Finally we formalize our goal in a constrastive learning objective:
 % \[\mathcal{L} = d(N_E(m_{t'}),N_E(\overline{m_{t'}}))\]
 
-\subsection{Implementation details}
-
-\jd{Fill in things like architecture etc. here.}
 
 \section{Related Prior Work}
 \label{sec:related_work}
@@ -392,11 +389,22 @@ In robotics contexts, where motion is attributable to known robot actions, sever
 
 \subsection{Datasets}
 \jd{If space, a figure up front just displaying a collection of images from each dataset to illustrate their corresponding visual domains.}
+We evaluate \textsc{flood} on three environments. The first one is a 3D blocks pushing dataset, which is adopted from C-SWM. For this dataset, we use a random policy to collect interaction data. The image has size of 50 x 50. 
+The second enviornment is a simulated control setup. In this environment, we use Mujoco to render a tabletop environment with three rigid bodies. We use a random policy to select which block to push at the start of each episode. Before each episode, we randomly initialize the robot start location as well as position and orientation of those three rigid bodies. The observation is provided as 128 x 128 images, looking down at the table top.
+The third environment is a photo-realistic control environment. For this environment, we use a locobot to collect object pushing data. In this environment, we have three non-rigid objects on the table. We use a random policy to collect robot-object interaction data. We use an external webcam to capture the images, each of size 128 x 128.
 
 \subsection{Evaluation Metrics}
-\textbf{MSE(Points)}\\
-\textbf{ARI}
+In order to evaluate the quality of learned object representations, we adopt two evaluation metrics. 
+\begin{itemize}
+    \item MSE(Points): To measure the precision of learned object representations, we trained $2*N*K$ Linear regressor to regress each of the $K$ slot vector to $N$ ground-truth object coordinates in the scene. We take the prediction with the lowest error across all slots and measure the MSE loss on predicted 2d pixel location of each object. 
+    \item ARI: To directly measure the quality of learned slot masks, we adopt the metric that's been commonly used in multi-object segmentation: Adjusted Random Index(ARI). ARI measure cluster similarity, and is permutation invariant. 
+\end{itemize}
+
+
 \subsection{Training and Evaluation Settings}
+For 3D blocks pushing dataset, we generate 1000 training episodes with 100 environment steps, and 10000 evaluation episodes with 10 environment steps. In order to measure the performance on those two metrics mentioned above, we also generate ground-truth segmentation mask and 2d keypoints for each observations. 
+For the simulated control dataset, we generate 1000 training episodes and 1000 evaluation episodes, each of them containing 15 enviornmental steps.
+For the photorealistic control dataset, we generate 400 episodes, each with 30 steps. We keep 350 episodes for training and 50 for evaluation.
 \subsection{Baselines}
 
 Throughout our experiments, we compare against three baselines, representing three different types of object discovery objectives from the literature. First, contrastive structured world models (\textbf{C-SWM})~\cite{kipf2019contrastive} represents joint object discovery and environment dynamics modeling through a future prediction objective. Slot attention (\textbf{SA})~\cite{locatello2020object} represents object discovery through image reconstruction. Finally, slot-contrastive network (\textbf{SCN})~\cite{racah2020slot}, discussed above in Sec~\ref{sec:related_work}, uses temporal continuity for object discovery: like \textsc{flood}, it trains representations that can distinguish far-away frame pairs from nearby frame pairs using a contrastive loss, but it does not use optical flow correspondences between nearby frames.
@@ -409,6 +417,7 @@ All three baselines represent objects through a slot-based representation simila
 % \textbf{C-SWM}\\
 % \textbf{Slot Contrastive Networks}\\
 % \textbf{Slot Attention}
+\subsection{Network Implementation Detail}
 
 \subsection{Experiment Setup}
 
@@ -431,8 +440,7 @@ Metrics: 1) Slot Accuracy
     \item different ways to sample positive and negative
 \end{itemize}
 
-\setlength{\tabcolsep}{20pt}
-\renewcommand{\arraystretch}{1.5}
+
 \begin{table}
   \caption{Comparing the objective functions used for training object-structured representations}
   \label{sample-table}
@@ -441,14 +449,15 @@ Metrics: 1) Slot Accuracy
     \toprule
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{dynamics modeling}    & \textbf{temporal continuity}     & \textbf{reconstruction}  \\
     \cmidrule(r){2-6}
-     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &286.178 &   -   \\
+     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &  &    \\
     \cmidrule(r){2-6}
-    & \textbf{ARI$\uparrow$}     &  0.5967258  & 0.4878859  & - &  0.50066 \\
+    & \textbf{ARI(\%)$\uparrow$}     &  93.56  & 70.93  &  &    \\
     \midrule
     \bottomrule
   \end{tabular}
 \end{table}
-
+\setlength{\tabcolsep}{20pt}
+\renewcommand{\arraystretch}{1.5}
 
 \begin{table}
   \caption{Sample table title}
@@ -460,21 +469,21 @@ Metrics: 1) Slot Accuracy
     \cmidrule(r){2-6}
      &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &286.178 &   -   \\
     \cmidrule(r){2-6}
-     & \textbf{ARI$\uparrow$}     &  0.5967258  & 0.4878859  & - &  0.50066 \\
+     & \textbf{ARI(\%)$\uparrow$}     &  93.56  & 70.93  & - &  0.50066 \\
     \midrule
     
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{REAL}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
     \cmidrule(r){2-6}
      & \textbf{MSE(Points)$\downarrow$} & 786.482287& 830.339&  806.727197   &   -   \\
     \cmidrule(r){2-6}
-    &\textbf{ARI$\uparrow$}      & 0.1685787  &  0.1596932  & - &    \\
+    &\textbf{ARI(\%)$\uparrow$}      & 16.86  &  15.97  & - &    \\
     \midrule
     
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{CUBES}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
     \cmidrule(r){2-6}
       & \textbf{MSE(Points)$\downarrow$}  & 59.92 &  54.79  &  &   -   \\
     \cmidrule(r){2-6}
-    &\textbf{ARI$\uparrow$}      &  &    & - &   \\
+    &\textbf{ARI(\%)$\uparrow$}     & 85.51  &   95.09 & - &   \\
     \bottomrule
   \end{tabular}
 \end{table}
