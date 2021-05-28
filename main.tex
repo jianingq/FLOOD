@@ -134,7 +134,7 @@ We show how these ideas extend to unsupervised neural object discovery. Our tech
 
 \begin{figure}
     \centering
-    \includegraphics[width=8cm]{flood_main_figure.pdf}
+    \includegraphics[width=8cm]{figs/flood_main_figure.pdf}
     \caption{Objects move as coherent wholes, therefore motions in natural video sequences preserve the object structure of the images, modulo minor boundary and occlusion effects. We identify the following simple desideratum for good discovered object-structured image representations such as the segmentation masks depicted here: object representations for nearby images in a video stream must be related to each other through the \emph{same optical flow masks} as the images themselves.}
     \label{fig:desired_property}
 \end{figure}
@@ -389,20 +389,22 @@ In robotics contexts, where motion is attributable to known robot actions, sever
 
 \subsection{Datasets}
 \jd{If space, a figure up front just displaying a collection of images from each dataset to illustrate their corresponding visual domains.}
-We evaluate \textsc{flood} on three environments. The first one is a 3D blocks pushing dataset, which is adopted from C-SWM. For this dataset, we use a random policy to collect interaction data. The image has size of 50 x 50. 
-The second enviornment is a simulated control setup. In this environment, we use Mujoco to render a tabletop environment with three rigid bodies. We use a random policy to select which block to push at the start of each episode. Before each episode, we randomly initialize the robot start location as well as position and orientation of those three rigid bodies. The observation is provided as 128 x 128 images, looking down at the table top.
-The third environment is a photo-realistic control environment. For this environment, we use a locobot to collect object pushing data. In this environment, we have three non-rigid objects on the table. We use a random policy to collect robot-object interaction data. We use an external webcam to capture the images, each of size 128 x 128.
+We evaluate \textsc{flood} on three environments. The first one is a 3D blocks pushing dataset (\textbf{CUBES}), which is adopted from C-SWM. This is a grid-world environment with discrete actions. We use a random policy to collect observation data of size 50 x 50 x 3. 
+
+The second environment is a simulated control environment (\textbf{SIM}). In this environment, we use Mujoco to render a tabletop with three rigid objects. Before each episode, we randomly initialize the robot start location as well as position and orientation of those three rigid objects. We use a random policy to select which block to push at the start of each episode.  The observation is provided as 128 x 128 x3 images, looking down at the table top.
+
+The third environment is a photo-realistic control environment (\textbf{REAL}). For this environment, we use a locobot to collect object pushing data. In this environment, we have three non-rigid objects on the table. We use a random policy to collect robot-object interaction data. We use an external webcam to capture the observations, each of size 128 x 128 x 3.
 
 \subsection{Evaluation Metrics}
 In order to evaluate the quality of learned object representations, we adopt two evaluation metrics. 
 \begin{itemize}
-    \item MSE(Points): To measure the precision of learned object representations, we trained $2*N*K$ Linear regressor to regress each of the $K$ slot vector to $N$ ground-truth object coordinates in the scene. We take the prediction with the lowest error across all slots and measure the MSE loss on predicted 2d pixel location of each object. 
-    \item ARI: To directly measure the quality of learned slot masks, we adopt the metric that's been commonly used in multi-object segmentation: Adjusted Random Index(ARI). ARI measure cluster similarity, and is permutation invariant. 
+    \item MSE(Points): To measure the precision of learned object representations, we trained $2*N*K$ Linear regressor to regress each of the $K$ slot vector to $N$ ground-truth 2D object coordinates in the scene. We take the prediction with the lowest error across all slots and measure the MSE loss on predicted 2D pixel location of each object. This metric allows us to directly measure the quality of learned slot vectors.
+    \item ARI: To directly measure the quality of learned slot masks, we adopt the metric that's been commonly used in multi-object segmentation: Adjusted Random Index(ARI)~\cite{ari1,ari2}. ARI measure cluster similarity, and is permutation invariant. We compare the set of slot masks produced by slot encoder with ground truth segmentation mask(excluding the background mask).
 \end{itemize}
 
 
 \subsection{Training and Evaluation Settings}
-For 3D blocks pushing dataset, we generate 1000 training episodes with 100 environment steps, and 10000 evaluation episodes with 10 environment steps. In order to measure the performance on those two metrics mentioned above, we also generate ground-truth segmentation mask and 2d keypoints for each observations. 
+For \texstbf{CUBES}, we generate 1000 training episodes with 100 environment steps, and 10000 evaluation episodes with 10 environment steps. In order to measure the performance on those two metrics mentioned above, we also generate ground-truth segmentation mask and 2d keypoints for each observations. 
 For the simulated control dataset, we generate 1000 training episodes and 1000 evaluation episodes, each of them containing 15 enviornmental steps.
 For the photorealistic control dataset, we generate 400 episodes, each with 30 steps. We keep 350 episodes for training and 50 for evaluation.
 \subsection{Baselines}
@@ -449,9 +451,9 @@ Metrics: 1) Slot Accuracy
     \toprule
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{dynamics modeling}    & \textbf{temporal continuity}     & \textbf{reconstruction}  \\
     \cmidrule(r){2-6}
-     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  & 970.53 &    \\
+     &  \textbf{MSE(Points)$\downarrow$}  & 100.86 &  99.61  & 455.04 &    \\
     \cmidrule(r){2-6}
-    & \textbf{ARI(\%)$\uparrow$}     &  93.56  & 70.93  &  &    \\
+    & \textbf{ARI(\%)$\uparrow$}     &  93.56  & 70.93  & 7.89 &    \\
     \midrule
     \bottomrule
   \end{tabular}
@@ -467,23 +469,23 @@ Metrics: 1) Slot Accuracy
     \toprule
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
     \cmidrule(r){2-6}
-     &  \textbf{MSE(Points)$\downarrow$}  & 100.86089 &  99.6055  &286.178 &   -   \\
+     &  \textbf{MSE(Points)$\downarrow$}  & 100.86 &  99.61  &286.18 &   -   \\
     \cmidrule(r){2-6}
      & \textbf{ARI(\%)$\uparrow$}     &  93.56  & 70.93  & - &  50.07 \\
     \midrule
     
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{REAL}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
     \cmidrule(r){2-6}
-     & \textbf{MSE(Points)$\downarrow$} & 786.482287& 830.339&  806.727197   &   -   \\
+     & \textbf{MSE(Points)$\downarrow$} & 786.48& 830.34&  806.73   &   -   \\
     \cmidrule(r){2-6}
     &\textbf{ARI(\%)$\uparrow$}      & 16.86  &  15.97  & - &  10.20  \\
     \midrule
     
     \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{CUBES}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
     \cmidrule(r){2-6}
-      & \textbf{MSE(Points)$\downarrow$}  & 59.92 &  54.79  & 332.417 &   -   \\
+      & \textbf{MSE(Points)$\downarrow$}  & 59.92 &  54.79  & 332.42 &   -   \\
     \cmidrule(r){2-6}
-    &\textbf{ARI(\%)$\uparrow$}     & 85.51  &   95.09 & - &   \\
+    &\textbf{ARI(\%)$\uparrow$}     & 85.51  &   95.09 & - & 85.29  \\
     \bottomrule
   \end{tabular}
 \end{table}
