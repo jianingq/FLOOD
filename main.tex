@@ -379,11 +379,15 @@ Recall that $x$ and $x'$ are temporally nearby frames, yet the positives above a
 
 This contrastive objective trivially precludes the all-zeros degenerate solution above. Avoiding the ``identity'' solution is more subtle: it is done by applying the contrastive loss to a compressed representation $\bm{z}=\mathcal{G}(\bm{m}(x))$, computed by a small MLP $\mathcal{G}$. The low capacity of $\mathcal{G}$ means that it should be very easy to extract a small code $\bm{z}$ that is sufficiently discriminative to minimize Eq~\ref{eq:flood_loss}. This forces the network to only represent only highly processed information in the masks $m^k$, thus avoiding the identity mapping $m^k(x)=x$. 
 
-\subsection{Network Implementation Detail}
+\subsection{Implementation Details}
 
-Lastly we describe some network implementation details. For the ``object extractor'' convolutional neural network $\mathcal{F}$, we use a four-layers convolutional neural network, each with a 3 x 3 kernel. The first three convolutional layers are followed by a relu and a batchnorm layer. The last convolutional layer is followed by a sigmoid, so that the predicted slot masks $\bm{m}(x)$ lie in $[0,1]$. 
+%Lastly we describe some network implementation details. 
+In our experiments, the object extractor $\mathcal{F}$ is a four-layered convolutional neural network. The first three convolutional layers are followed by a relu and a batchnorm layer. The last convolutional layer is followed by a sigmoid, so that the predicted slot masks $\bm{m}(x)$ lie in $[0,1]$.  %, with a 3 x 3 kernels on each layer This convolutional neural network $\mathcal{F}$ is followed by a 
+The object encoder $\mathcal{G}$ is a small multi-layer perceptron 
+%that takes in flattened slot masks $m^k(x)$ and produced slot vectors $z^k(x)$. $\mathcal{G}$ 
+consisting of three layers, with a LayerNorm~\cite{LayerN} between the second and the third MLP layer. We use the Adam optimizer and train this network on a single 2080Ti GPU with batch size of 1024. 
 
-This convolutional neural network $\mathcal{F}$ is followed by a small multi-layer perceptron $\mathcal{G}$, that takes in slot masks $\bm{m}(x)$ and produced slot vectors $\bm{z}(x)$. $\mathcal{G}$ consists of three MLP layers, and another LayerNorm~\cite{LayerN} between the second and the third MLP layer. We use Adam optimizer and train this network on a single 2080Ti GPU with batch size of 1024. 
+There are two main hyperparameters in our method: slot vector dimension and slot number. For all experiments with our method, we fix the slot number to six. We keep all the other training hyperparameters as well as slot vector dimension as the same from C-SWM.
 
 
 %\jd{Need to talk about how both degenerate solutions are avoided?}
@@ -405,7 +409,7 @@ Our experiments aim to answer the following questions: \textbf{(1)} How well doe
 
 %When controlling the representation, how well does 
 
-\subsection{Baselines and Ablations}
+\subsection{Baselines and Ablations}\label{sec:baselines}
 
 Throughout our experiments, we compare against three recent baselines, representing different types of object discovery objectives from the literature. 
 
@@ -416,7 +420,7 @@ Throughout our experiments, we compare against three recent baselines, represent
 \end{itemize}
 % as discussed in Sec~\ref{sec:related_work}
 
-\textsc{flood} inherits the object extractor and object encoder of C-SWM, which is also used in SCN, making it particularly well-suited for comparison. To enable a more controlled comparison of object discovery approaches with a fixed architecture, we create two ablations of our method that use an SCN-like ``temporal continuity'' objective, and another that uses an SA-like image ``reconstruction'' objective (``Recon''). Since C-SWM already shares the same architecture, it doubles up as the third ablation, representing a ``dynamics modeling'' objective. %\jd{Use these names in the table, or change these names.}
+\textsc{flood} inherits the object extractor and object encoder of C-SWM, which is also used in SCN, making it particularly well-suited for comparison. To enable a more controlled comparison of object discovery approaches with a fixed architecture, we create two ablations of our method that use an SCN-like ``temporal continuity'' objective, and another that uses an SA-like image ``reconstruction'' objective. Since C-SWM already shares the same architecture, it doubles up as the third ablation, representing a ``dynamics modeling'' objective. %\jd{Use these names in the table, or change these names.}
 
 %SA proposes a new attention-based architecture for encoding images into object slots.
 
@@ -449,9 +453,9 @@ Throughout our experiments, we compare against three recent baselines, represent
 \end{figure}
 We evaluate \textsc{flood} on three video datasets: 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{CUBES} is a 3D blocks dataset, adopted from \citet{kipf2019contrastive}. This is a grid-world environment with discrete actions applied to selected blocks, such as ``move object 1 one step forward'' and ``move object 2 one step left''). \jd{Check for accuracy}\aq{correct} We use the authors' code to collect a video dataset with a random action policy, using identical settings as in \citet{kipf2019contrastive}. We train on 1000 training videos of length 100 frames each, and evaluate on 10,000 videos of length 10. All frames are 50x50 RGB images. The robot executes a new action in each frame. For C-SWM, object-specific actions are provided as \jd{Fill in}.
-    \item \textbf{SIM} is collected in a custom new simulated robotic manipulation environment. We use MuJoCo~\cite{todorov2012mujoco} to render a tabletop with three simple object shapes (a green cube, a red cube, and a blue cylinder) and a Fetch robot. We collect 1000 training videos and 1000 testing videos, all of length 15 frames, involving 15 separate robot motions. In each episode, the robot randomly picks one object and a direction to push it to. \jd{and a location to push it to? or a direction to push it in?}.  All frames are 128 x 128 RGB images. For C-SWM, object-specific actions are provided as \jd{Fill in}.
-    \item \textbf{REAL} is analogous to \textbf{SIM}, but collected on a real robot arm, and with more complex objects and dynamics. We use a WidowX 200 robot arm and three deformable toys. The videos involve the robot performing random end-effector motions in each frame, colliding frequently with the objects and displacing them. We collect 350 training videos, and evaluate on 50 videos, all of length 30. All frames are 128 x 128 RGB images. For C-SWM, object-specific actions are provided as \jd{Fill in}.
+    \item \textbf{CUBES} is a 3D blocks dataset, adopted from \citet{kipf2019contrastive}. This is a grid-world environment with discrete actions applied to selected blocks, such as ``move object 1 one step forward'' and ``move object 2 one step left''). We use the authors' code to collect a video dataset with a random action policy, using identical settings as in \citet{kipf2019contrastive}. We train on 1000 training videos of length 100 frames each, and evaluate on 10,000 videos of length 10. All frames are 50x50 RGB images. The robot executes a new action in each frame. For C-SWM, object-specific actions are provided as a four-dimensional one-hot vector(if an action is applied to that object) or a vector of zeros for each object slot.
+    \item \textbf{SIM} is collected in a custom new simulated robotic manipulation environment. We use MuJoCo~\cite{todorov2012mujoco} to render a tabletop with three simple object shapes (a green cube, a red cube, and a blue cylinder) and a Fetch robot. We collect 1000 training videos and 1000 testing videos, all of length 15 frames, involving 15 separate robot motions. In each episode, the robot randomly picks one object and a direction to push it to.  All frames are 128 x 128 RGB images. For C-SWM, object-specific actions are provided as a two-dimensional vector(if an action is applied to that object) or a vector of zeros for each object slot.
+    \item \textbf{REAL} is analogous to \textbf{SIM}, but collected on a real robot arm, and with more complex objects and dynamics. We use a WidowX 200 robot arm and three deformable toys. The videos involve the robot performing random end-effector motions in each frame, colliding frequently with the objects and displacing them. We collect 350 training videos, and evaluate on 50 videos, all of length 30. All frames are 128 x 128 RGB images. For C-SWM, object-specific actions are provided as a five-dimensional vector(if an action is applied to that object) or a vector of zeros for each object slot.
 \end{itemize}
 
 We will publicly release all datasets and code. Sample frames from all datasets are shown in Fig~\ref{fig:datasets}.
@@ -498,27 +502,77 @@ Note that SA does not produce slot vectors, so we omit its KLME in our quantitat
 %\subsection{Experiment Setup}
 
 \subsection{Results}
-Quantitative results are summarized in Table~\ref{table:objective} and Table~\ref{table:main-result}.
+\setlength{\tabcolsep}{20pt}
+\renewcommand{\arraystretch}{1.5}
+
+
+\begin{table}[t]
+  \caption{Quantitative comparison against published baselines. Best performance in \textbf{bold}}
+  \label{table:main-result}
+  \centering
+  \resizebox{\textwidth}{!}{
+  \begin{tabular}{llllll}
+    \toprule
+       & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}~\cite{kipf2019contrastive}    & \textbf{SCN}~\cite{racah2020slot}     & \textbf{SA}~\cite{locatello2020object}  \\
+    \midrule
+    \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & \textbf{ARI(\%)$\uparrow$}     &  \textbf{93.56}  & 70.93  & - &  50.07 \\
+    \cmidrule(r){2-6}
+    &  \textbf{KLME$\downarrow$}  & \textbf{100.86} &  \textbf{99.61}  &286.18 &   -   \\
+    \midrule
+    
+     \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{REAL}}} &\textbf{ARI(\%)$\uparrow$}      & \textbf{16.86}  &  \textbf{15.97}  & - &  10.20  \\
+    \cmidrule(r){2-6}
+    & \textbf{KLME$\downarrow$} & \textbf{786.48}& 830.34&  806.73   &   -   \\
+    \midrule
+    
+      \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{CUBES}}}&\textbf{ARI(\%)$\uparrow$}     & 85.51  &   \textbf{95.09} & - & 85.29  \\
+    \cmidrule(r){2-6}
+        & \textbf{KLME$\downarrow$}  & 59.92 &  \textbf{54.79}  & 332.42 &   -   \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+
+Table~\ref{table:main-result} summarizes results for our method and the baselines on all three datasets. 
+Our method easily outperforms SA and SCN, and performs comparably with C-SWM, which has access to additional information about object actions at each step. In particular, C-SWM  shines on \textbf{CUBES}, the simplest environment, where object-specific actions are discrete and cleanest. 
+
+Table~\ref{table:objective} shows results of the objective function ablations of our approach mentioned above in Sec~\ref{sec:baselines}, with network architecture fixed. These results are reported on on \textbf{SIM}, which has clean annotations of object segmentations and keypoints for evaluation. 
+%We show results for a controlled comparison of object discovery approaches in . For this experiment, we fix the object discovery network structure, and only change the training objective. 
+%In addition to the training objective used in our method, we adopted three other objectives: "dynamics modeling", "temporal continuity" and "reconstruction" from our baseline methods. 
+Once again, we easily outperform the baselines, illustrating that the flow-guided objective is important to our method's overall performance. 
+%Our training objective performs the best in terms of ARI, illustrating that our training objective produces the best quality slot masks comparing to all the other three baselines.
+
+%In both \textbf{SIM} and \textbf{REAL}, where the action labels are continuous, our method out performs all the other three baselines in terms of slot mask prediction quality. 
+%In general, we observe that our method compares favorably against the other three baselines. Our method's performance in \textbf{CUBES} is slightly worse than our baseline C-SWM. However, it is worth noting that \textbf{CUBES} is a relatively simple environment and the discrete action label is available at training time for C-SWM. In both \textbf{SIM} and \textbf{REAL}, where the action labels are continuous, our method out performs all the other three baselines in terms of slot mask prediction quality. 
+
+Fig~\ref{fig:qual_sim} and~\ref{fig:qual_real} show examples of masks produced by \textsc{flood} and baselines for two images per dataset. 
+For each object in the scene, we show the mask that most frequently binds to it. 
+Some methods do not successfully bind to all objects in the scene; for them, we do leave empty spaces representing missing slots.
+More extensive results, including all slot masks produced by each method, are shown in Supp.
+
+
+
 \begin{figure}
   \centering
-  \includegraphics[width=9cm]{figs/qual_sim.pdf}
-  \caption{Examples of masks produced by \textsc{flood} and baselines on SIM images.}
+  \includegraphics[height=0.3\textheight]{figs/qual_cubes.pdf}
+  \includegraphics[height=0.3\textheight]{figs/qual_sim.pdf}
+%  \caption{Examples of masks produced by \textsc{flood} and baselines on SIM images.}
+%   \label{fig:qual_sim}
+% \end{figure}
+% \begin{figure}
+%   \centering
+  \caption{Examples of masks produced by \textsc{flood} and baselines on CUBES and SIM images. While C-SWM produces very crisp masks for all objects on CUBES, it interestingly fails to represent the robot (``object 4'') in SIM, despite the object-specific actions being easiest to specify for the robot. }
   \label{fig:qual_sim}
 \end{figure}
 
 \begin{figure}
   \centering
-  \includegraphics[width=9cm]{figs/qual_real.pdf}
-  \caption{Examples of masks produced by \textsc{flood} and baselines on REAL images}
+  \includegraphics[height=0.45\textheight]{figs/qual_real.pdf}
+  \caption{Examples of masks produced by \textsc{flood} and baselines on REAL images. This is the hardest setting, and all methods produce less crisp masks. However, C-SWM and our approach can both successfully learn to represent the three objects in the image, and both are unable to learn the robot.}
   \label{fig:qual_real}
 \end{figure}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=9cm]{figs/qual_cubes.pdf}
-  \caption{Examples of masks produced by \textsc{flood} and baselines on REAL images}
-  \label{fig:qual_real}
-\end{figure}
+
 % \textbf{Question 1.} Does our method learn more accurate object centric representations?
 % Metrics: 1) Slot Accuracy 
 
@@ -528,8 +582,8 @@ Quantitative results are summarized in Table~\ref{table:objective} and Table~\re
 
 %\jd{Prepare figures showing 1-2 nice examples for each dataset, perhaps a set of rows, where each row contains the input image, then the output masks of all baselines and our method for that image, similar to visualizations in papers like IODINE.}
 
-\subsection{Ablation}
-
+%\subsection{Ablation}
+%We show results for a controlled comparison of object discovery approaches in Table~\ref{table:objective}. For this experiment, we fix the object discovery network structure, and only change the training objective. In addition to the training objective used in our method, we adopted three other objectives: "dynamics modeling", "temporal continuity" and "reconstruction" from our baseline methods. Our training objective performs the best in terms of ARI, illustrating that our training objective produces the best quality slot masks comparing to all the other three baselines.
 % \begin{itemize}
 %     \item same C-SWM architecture: compare our flow-guided contrastive objective to C-SWM's objective (already there), SCN's temporal continuity objective, and standard reconstruction objective.
 %     \item Qualitative analysis / failure examples 
@@ -540,60 +594,12 @@ Quantitative results are summarized in Table~\ref{table:objective} and Table~\re
 % \end{itemize}
 
 
-\begin{table}
-  \caption{Comparing the objective functions used for training object-structured representations}
-  \label{table:objective}
-  \resizebox{\textwidth}{!}{
-  \centering
-  \begin{tabular}{llllll}
-    \toprule
-    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{dynamics modeling}    & \textbf{temporal continuity}     & \textbf{reconstruction}  \\
-    \cmidrule(r){2-6}
-     & \textbf{ARI(\%)$\uparrow$}     &  \textbf{93.56}  & 70.93  & 7.89 & 33.35   \\
-    \cmidrule(r){2-6}
-    &  \textbf{KLME$\downarrow$}  & \textbf{100.86} &  \textbf{99.61}  & 455.04 & 396.82    \\
-    %\midrule
-    \bottomrule
-  \end{tabular}
-  }
-\end{table}
-\setlength{\tabcolsep}{20pt}
-\renewcommand{\arraystretch}{1.5}
 
-\begin{table}
-  \caption{Sample table title}
-  \label{table:main-result}
-  \centering
-  \resizebox{\textwidth}{!}{
-  \begin{tabular}{llllll}
-    \toprule
-    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
-    \cmidrule(r){2-6}
-    & \textbf{ARI(\%)$\uparrow$}     &  \textbf{93.56}  & 70.93  & - &  50.07 \\
-    \cmidrule(r){2-6}
-    &  \textbf{KLME$\downarrow$}  & 100.86 &  \textbf{99.61}  &286.18 &   -   \\
-    \midrule
-    
-    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{REAL}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
-    \cmidrule(r){2-6}
-     &\textbf{ARI(\%)$\uparrow$}      & \textbf{16.86}  &  15.97  & - &  10.20  \\
-    \cmidrule(r){2-6}
-    & \textbf{KLME$\downarrow$} & \textbf{786.48}& 830.34&  806.73   &   -   \\
-    \midrule
-    
-    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{CUBES}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{C-SWM}    & \textbf{SCN}     & \textbf{SA}  \\
-    \cmidrule(r){2-6}
-      &\textbf{ARI(\%)$\uparrow$}     & 85.51  &   \textbf{95.09} & - & 85.29  \\
-    \cmidrule(r){2-6}
-        & \textbf{KLME$\downarrow$}  & 59.92 &  \textbf{54.79}  & 332.42 &   -   \\
-    \bottomrule
-  \end{tabular}
-  }
-\end{table}
+
 
 \begin{comment}
 \begin{table}
-  \caption{Sample table title}
+  \caption{Main evaluation results for slot representation quality. Best performance in \textbf{bold}}
   \label{sample-table}
   \centering
   \begin{tabular}{lllll}
@@ -680,7 +686,32 @@ Quantitative results are summarized in Table~\ref{table:objective} and Table~\re
   \end{tabular}
 \end{table}
 \end{comment}
+
+\begin{table}
+  \caption{Quantitative comparison of flow-guided (ours) vs. other training objectives on \textbf{SIM}}
+  \label{table:objective}
+  \resizebox{\textwidth}{!}{
+  \centering
+  \begin{tabular}{llllll}
+    \toprule
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{SIM}}} & & \textbf{\textsc{flood}(Ours)}      & \textbf{dynamics modeling}    & \textbf{temporal continuity}     & \textbf{reconstruction}  \\
+    \cmidrule(r){2-6}
+     & \textbf{ARI(\%)$\uparrow$}     &  \textbf{93.56}  & 70.93  & 7.89 & 33.35   \\
+    \cmidrule(r){2-6}
+    &  \textbf{KLME$\downarrow$}  & \textbf{100.86} &  \textbf{99.61}  & 455.04 & 396.82    \\
+    %\midrule
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+
 \section{Conclusions}\label{sec:conclusions}
+
+In this paper, we design a new approach for unsupervised object discovery that is informed by optical flow correspondences between neighboring images in video. We show that this easily outperforms baselines that learn object-structured representations from general videos, and even performs comparably with an approach that learns from additional object-specific information.
+
+However, our approach is dependent on optical flow providing reliable correspondences. While optical flow approaches are mature, there remain difficulties in producing reliable correspondences in the presence of clutter, occlusions, and lighting changes. We do not handle such noisy correspondences in our approach, and leave it for future work. Our own experimental settings did not prove to suffer from these issues, but they may arise in still more challenging settings.
+
+%these are still challenging tasks with more 
 
 
 % \section{Citations, figures, tables, references}
@@ -906,68 +937,61 @@ Checklist section heading above along with the questions/answers below.
 \item For all authors...
 \begin{enumerate}
   \item Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
-    \answerTODO{}
+    \answerYes{See abstract}
   \item Did you describe the limitations of your work?
-    \answerTODO{}
+    \answerYes{we discussed the limiations of our method in conclusion. We will include additional analysis of limitations of our work in supplemental material}
   \item Did you discuss any potential negative societal impacts of your work?
-    \answerTODO{}
+    \answerNo{We do not focus on specific applications in this work. Like any such basic research approaches, while applications might have the potential for negative impacts, it is difficult to meaningfully foresee them for this work.}
   \item Have you read the ethics review guidelines and ensured that your paper conforms to them?
-    \answerTODO{}
+    \answerYes{}
 \end{enumerate}
 
 \item If you are including theoretical results...
 \begin{enumerate}
   \item Did you state the full set of assumptions of all theoretical results?
-    \answerTODO{}
+    \answerNA{}
 	\item Did you include complete proofs of all theoretical results?
-    \answerTODO{}
+    \answerNA{}
 \end{enumerate}
 
 \item If you ran experiments...
 \begin{enumerate}
   \item Did you include the code, data, and instructions needed to reproduce the main experimental results (either in the supplemental material or as a URL)?
-    \answerTODO{}
+    \answerYes{We cited the works that we took our dataset from. We will include our code and dataset in the supplemental material}
   \item Did you specify all the training details (e.g., data splits, hyperparameters, how they were chosen)?
-    \answerTODO{}
+    \answerYes{In section 3.4 and 4.2}
 	\item Did you report error bars (e.g., with respect to the random seed after running experiments multiple times)?
-    \answerTODO{}
+    \answerNA{}
 	\item Did you include the total amount of compute and the type of resources used (e.g., type of GPUs, internal cluster, or cloud provider)?
-    \answerTODO{}
+    \answerYes{In section 3.4}
 \end{enumerate}
 
 \item If you are using existing assets (e.g., code, data, models) or curating/releasing new assets...
 \begin{enumerate}
   \item If your work uses existing assets, did you cite the creators?
-    \answerTODO{}
+    \answerYes{In section 4.2}
   \item Did you mention the license of the assets?
-    \answerTODO{}
+    \answerYes{We cite the paper that we took the dataset from in section 4.2}
   \item Did you include any new assets either in the supplemental material or as a URL?
-    \answerTODO{}
+    \answerNo{}
   \item Did you discuss whether and how consent was obtained from people whose data you're using/curating?
-    \answerTODO{}
+    \answerYes{}
   \item Did you discuss whether the data you are using/curating contains personally identifiable information or offensive content?
-    \answerTODO{}
+    \answerYes{No they don't contain personally identifiable information or offensive content.}
 \end{enumerate}
 
 \item If you used crowdsourcing or conducted research with human subjects...
 \begin{enumerate}
   \item Did you include the full text of instructions given to participants and screenshots, if applicable?
-    \answerTODO{}
+    \answerNA{}
   \item Did you describe any potential participant risks, with links to Institutional Review Board (IRB) approvals, if applicable?
-    \answerTODO{}
+    \answerNA{}
   \item Did you include the estimated hourly wage paid to participants and the total amount spent on participant compensation?
-    \answerTODO{}
+    \answerNA{}
 \end{enumerate}
 
 \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\appendix
-
-\section{Appendix}
-
-Optionally include extra information (complete proofs, additional experiments and plots) in the appendix.
-This section will often be part of the supplemental material.
 
 \end{document}
